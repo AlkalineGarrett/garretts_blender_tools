@@ -27,6 +27,14 @@ class RepelObjectsOperator(bpy.types.Operator):
 
     def execute(self, context):
 
+        if len(context.selected_objects) == 0:
+            self.report({'ERROR'}, 'No objects selected. Two or more need to be selected to repel.')
+            return {'CANCELLED'}
+
+        if len(context.selected_objects) == 1:
+            self.report({'ERROR'}, '1 object selected. Two or more need to be selected to repel.')
+            return {'CANCELLED'}
+
         obj1 = context.selected_objects[0]
         center1 = get_world_center(obj1)
 
