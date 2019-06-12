@@ -35,26 +35,27 @@ class RepelObjectsOperator(bpy.types.Operator):
             self.report({'ERROR'}, '1 object selected. Two or more need to be selected to repel.')
             return {'CANCELLED'}
 
-        obj1 = context.selected_objects[0]
-        center1 = get_world_center(obj1)
+        center_sum = Vector([0.0, 0.0, 0.0])
+        radius_sum = 0.0
+        for obj in context.selected_objects:
+            center_sum += get_world_center(obj)
+            # Get the length of the vector from center of the object to the
+            #   first corner of the bounding box of the object
+            # This will be fine for objects close to squares, but less
+            #   consistent for elongated objects. It is simple, though.
+            radius = (get_local_center(obj) - Vector(obj.bound_box[0])).length
+            radius_sum =+ radius
+        group_center = center_sum / len(context.selected_objects)
+        avg_radius = radius_sum / len(context.selected_objects)
 
-        obj2 = context.selected_objects[1]
-        center2 = get_world_center(obj2)
-
-        obj1_translate = center1 - center2
-        obj2_translate = center2 - center1
-
-        # Gives length of the vector from center of object to corner of bounding box of the object
-        trans_dist1 = (get_local_center(obj1) - Vector(obj1.bound_box[0])).length
-        trans_dist2 = (get_local_center(obj2) - Vector(obj2.bound_box[0])).length
-        # Average distance for the two objects
-        trans_dist = (trans_dist1 + trans_dist2) / 2
-
-        obj1_translate = obj1_translate * trans_dist / obj1_translate.length
-        obj2_translate = obj2_translate * trans_dist / obj2_translate.length
-
-        obj1.location += obj1_translate
-        obj2.location += obj2_translate
+        for obj in context.selected_objects:
+            # Get the vector from the group center to this object
+            center_to_obj = get_world_center(obj) - group_center
+            # Scale the vector
+            #   Starting length: distance from group center to this object
+            #   Ending length: average radius of the selected objects
+            obj_translate = center_to_obj * avg_radius / center_to_obj.length
+            obj.location += obj_translate
 
         return {'FINISHED'}
 
