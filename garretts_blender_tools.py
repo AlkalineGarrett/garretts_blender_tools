@@ -20,6 +20,30 @@ def get_local_center(obj):
 def get_world_center(obj):
     return obj.matrix_world * get_local_center(obj)
 
+def repel(context):
+    center_sum = Vector([0.0, 0.0, 0.0])
+    radius_sum = 0.0
+    for obj in context.selected_objects:
+        center_sum += get_world_center(obj)
+        # Get the length of the vector from center of the object to the
+        #   first corner of the bounding box of the object
+        # This will be fine for objects close to squares, but less
+        #   consistent for elongated objects. It is simple, though.
+        radius = (get_local_center(obj) - Vector(obj.bound_box[0])).length
+        radius_sum =+ radius
+    group_center = center_sum / len(context.selected_objects)
+    avg_radius = radius_sum / len(context.selected_objects)
+
+    for obj in context.selected_objects:
+        # Get the vector from the group center to this object
+        center_to_obj = get_world_center(obj) - group_center
+        # Scale the vector
+        #   Starting length: distance from group center to this object
+        #   Ending length: average radius of the selected objects
+        if center_to_obj.length > 0.0:
+            obj_translate = center_to_obj * avg_radius / center_to_obj.length
+        obj.location += obj_translate
+
 class RepelObjectsOperator(bpy.types.Operator):
     """[GBP] Repel Objects"""
     bl_idname = "object.gbp_repel_objects_operator"
@@ -36,27 +60,7 @@ class RepelObjectsOperator(bpy.types.Operator):
             self.report({'ERROR'}, '1 object selected. Two or more need to be selected to repel.')
             return {'CANCELLED'}
 
-        center_sum = Vector([0.0, 0.0, 0.0])
-        radius_sum = 0.0
-        for obj in context.selected_objects:
-            center_sum += get_world_center(obj)
-            # Get the length of the vector from center of the object to the
-            #   first corner of the bounding box of the object
-            # This will be fine for objects close to squares, but less
-            #   consistent for elongated objects. It is simple, though.
-            radius = (get_local_center(obj) - Vector(obj.bound_box[0])).length
-            radius_sum =+ radius
-        group_center = center_sum / len(context.selected_objects)
-        avg_radius = radius_sum / len(context.selected_objects)
-
-        for obj in context.selected_objects:
-            # Get the vector from the group center to this object
-            center_to_obj = get_world_center(obj) - group_center
-            # Scale the vector
-            #   Starting length: distance from group center to this object
-            #   Ending length: average radius of the selected objects
-            obj_translate = center_to_obj * avg_radius / center_to_obj.length
-            obj.location += obj_translate
+        repel(context)
 
         return {'FINISHED'}
 
@@ -168,9 +172,12 @@ class SplitObjectOperator(bpy.types.Operator):
 
         bpy.ops.mesh.separate(type='LOOSE')
 
-        # TODO:
-        # - delete splitting plane
-        # - call 'repel'
+        bpy.ops.object.editmode_toggle()
+        # Assumption: the original object will only contain the splitting plane,
+        #   because the split objects became new objects
+        # We now remove the splitting plane
+        bpy.data.objects.remove(obj, True)
+        repel(context)
 
         return {'FINISHED'}
 
